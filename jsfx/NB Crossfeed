@@ -1,0 +1,252 @@
+// This effect Copyright (C) 2004 and later Cockos Incorporated
+// License: LGPL - http://www.gnu.org/licenses/lgpl.html
+desc:NB Crossfeed Experiment
+tags: crossfeed delay
+author: NB
+
+// delay from...
+//desc: Delay
+//author: Cockos
+
+// HP+LP from...
+//desc:RBJ Highpass/Lowpass Filters
+//author: Stillwell
+
+// Inspiration...
+// https://www.meier-audio.com/crossfeed.html
+
+slider1:5<0,10,0.1>Delay (ms)
+// slider2:-120<-120,6,1>Feedback (dB)
+// slider3:0<-120,6,1>Mix In (dB)
+slider4:-6<-20,0,0.25>Output Wet (dB)
+slider5:0<-120,6,1>Output Dry (dB)
+// filters
+slider7:0<0,1000,10>HPF
+slider8:22000<1000,22000,100>LPF
+// slider9:0<-20,20,0.1>Gain
+slider10:0<0,1,1{Off,On}>Resample On Length Change
+
+in_pin:left input
+in_pin:right input
+out_pin:left output
+out_pin:right output
+
+in_pin:left input
+in_pin:right input
+out_pin:left output
+out_pin:right output
+
+@init
+  delaypos=0;
+  // from filter
+  ext_tail_size = -1;
+  hpf = 0;
+  gain1 = 0;
+  freq1 = slider1;
+  a1 = 1;
+  s1 = 1;
+  q1 = 1 / (sqrt((a1 + 1/a1)*(1/s1 - 1) + 2));
+  w01 = 2 * $pi * freq1/srate;
+  cosw01 = cos(w01);
+  sinw01 = sin(w01);
+  alpha1 = sinw01 / (2 * q1);
+
+  b01 = (1 + cosw01)/2;
+  b11 = -(1 + cosw01);
+  b21 = (1 + cosw01)/2;
+  a01 = 1 + alpha1;
+  a11 = -2 * cosw01;
+  a21 = 1 - alpha1;
+  b01 /= a01;
+  b11 /= a01;
+  b21 /= a01;
+  a11 /= a01;
+  a21 /= a01;
+
+  lpf = 0;
+  gain3 = 0;
+  freq3 = 22000;
+  a3 = 10^(gain3/40);
+  s3 = 2;
+  q3 = 1 / (sqrt((a3 + 1/a3)*(1/s3 - 1) + 2));
+  w03 = 2 * $pi * freq3/srate;
+  cosw03 = cos(w03);
+  sinw03 = sin(w03);
+  alpha3 = sinw03 / (2 * q3);
+
+  b03 = (1 - cosw03)/2;
+  b13 = (1 - cosw03);
+  b23 = (1 - cosw03)/2;
+  a03 = 1 + alpha3;
+  a13 = -2 * cosw03;
+  a23 = 1 - alpha3;
+  b03 /= a03;
+  b13 /= a03;
+  b23 /= a03;
+  a13 /= a03;
+  a23 /= a03;
+
+  gain = 1;
+  
+
+@slider
+  odelay=delaylen;
+  delaylen=min(slider1 * srate / 1000,500000);
+  odelay != delaylen ? (
+  // was slider6
+    slider10 && odelay > delaylen ? (
+      // resample down delay buffer, heh
+      rspos=0; rspos2=0;
+      drspos=odelay/delaylen;
+      loop(delaylen,
+         
+         tpos = ((rspos)|0)*2;
+         rspos2[0]=tpos[0];
+         rspos2[1]=tpos[1];
+
+         rspos2+=2;
+         rspos+=drspos;
+      );
+      delaypos /= drspos;
+      delaypos|=0;
+      delaypos<0?delaypos=0;
+   ) : (
+   slider10 && odelay < delaylen ? (
+        // resample up delay buffer, heh
+        drspos=odelay/delaylen;
+        rspos=odelay; 
+        rspos2=delaylen*2;
+        loop(delaylen,
+           rspos-=drspos;
+           rspos2-=2;
+         
+           tpos = ((rspos)|0)*2;
+           rspos2[0]=tpos[0];
+           rspos2[1]=tpos[1];
+
+        );
+        delaypos /= drspos;
+        delaypos|=0;
+        delaypos<0?delaypos=0;
+    ) : (!slider10 && delaypos >= delaylen ? delaypos = 0);
+  );
+  freembuf(delaylen*2);
+);
+
+  // no feedback
+  wetmix = 0;
+  // no mixin
+  // drymix = 2 ^(slider3/6);
+  drymix = 1;
+  //
+  wetmix2 = 2 ^(slider4/6);
+  drymix2 = 2 ^(slider5/6);
+
+
+  // filter 
+  // slider 9 isn't used set to 0
+  freq1 = slider7;
+  freq3 = slider8;
+  gain = 10^(0/20);
+
+  slider7 == 0 ? hpf = 0 : hpf = 1;
+  slider8 == 22000 ? lpf = 0 : lpf = 1;
+
+  a1 = 1;
+  s1 = 1;
+  q1 = 1 / (sqrt((a1 + 1/a1)*(1/s1 - 1) + 2));
+  w01 = 2 * $pi * freq1/srate;
+  cosw01 = cos(w01);
+  sinw01 = sin(w01);
+  alpha1 = sinw01 / (2 * q1);
+
+  b01 = (1 + cosw01)/2;
+  b11 = -(1 + cosw01);
+  b21 = (1 + cosw01)/2;
+  a01 = 1 + alpha1;
+  a11 = -2 * cosw01;
+  a21 = 1 - alpha1;
+  b01 /= a01;
+  b11 /= a01;
+  b21 /= a01;
+  a11 /= a01;
+  a21 /= a01;
+
+  a3 = 1;
+  s3 = 1;
+  q3 = 1 / (sqrt((a3 + 1/a3)*(1/s3 - 1) + 2));
+  w03 = 2 * $pi * freq3/srate;
+  cosw03 = cos(w03);
+  sinw03 = sin(w03);
+  alpha3 = sinw03 / (2 * q3);
+
+  b03 = (1 - cosw03)/2;
+  b13 = (1 - cosw03);
+  b23 = (1 - cosw03)/2;
+  a03 = 1 + alpha3;
+  a13 = -2 * cosw03;
+  a23 = 1 - alpha3;
+  b03 /= a03;
+  b13 /= a03;
+  b23 /= a03;
+  a13 /= a03;
+  a23 /= a03;
+
+@sample
+
+  // crossfeed
+  dpint = delaypos*2;
+  os1=dpint[0];
+  os2=dpint[1];
+  
+  dpint[0]=min(max(spl0*drymix + os1*wetmix,-4),4);
+  dpint[1]=min(max(spl1*drymix + os2*wetmix,-4),4);
+
+  (delaypos+=1) >= delaylen ? delaypos=0;
+
+   // add delayed ch1 to ch2 and vice versa
+
+
+  // filter
+  // high pass
+  hpf != 0 ? (
+  ospl0 = os1;
+  os1 = b01 * os1 + b11 * xl11 + b21 * xl21 - a11 * yl11 - a21 * yl21;
+  xl21 = xl11;
+  xl11 = ospl0;
+  yl21 = yl11;
+  yl11 = os1;
+
+  ospl1 = os2;
+  os2 = b01 * os2 + b11 * xr11 + b21 * xr21 - a11 * yr11 - a21 * yr21;
+  xr21 = xr11;
+  xr11 = ospl1;
+  yr21 = yr11;
+  yr11 = os2;
+  );
+
+  // low pass
+  lpf != 0 ? (
+  ospl0 = os1;
+  os1 = b03 * os1 + b13 * xl13 + b23 * xl23 - a13 * yl13 - a23 * yl23;
+  xl23 = xl13;
+  xl13 = ospl0;
+  yl23 = yl13;
+  yl13 = os1;
+
+  ospl1 = os2;
+  os2 = b03 * os2 + b13 * xr13 + b23 * xr23 - a13 * yr13 - a23 * yr23;
+  xr23 = xr13;
+  xr13 = ospl1;
+  yr23 = yr13;
+  yr13 = os2;
+  );
+
+  os1 *= gain;
+  os2 *= gain;
+
+  // output
+  spl0=spl0*drymix2 + os2*wetmix2;
+  spl1=spl1*drymix2 + os1*wetmix2;
+
+  
